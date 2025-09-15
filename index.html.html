@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Drew Architects – Residential Area Schedule Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#ffffff; --text:#111; --muted:#666; --line:#e6e6e6; --brand:#0f172a;
+      --accent:#f3f4f6; --focus:#1d4ed8;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans";}
+    .wrap{max-width:980px;margin:32px auto;padding:0 16px 48px;}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    h1{font-size:22px;margin:0;color:var(--brand);font-weight:700}
+    .subtitle{color:var(--muted);margin:4px 0 16px}
+    .panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+    th{text-align:left;font-weight:600;background:var(--accent)}
+    input[type="number"]{width:90px;padding:6px;border:1px solid var(--line);border-radius:6px}
+    input[type="text"]{width:100%;max-width:260px;padding:6px;border:1px solid var(--line);border-radius:6px}
+    input[type="checkbox"]{width:18px;height:18px}
+    .row-actions button,.top-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:8px 10px;cursor:pointer}
+    .row-actions button:hover,.top-actions button:hover{border-color:var(--focus)}
+    .totals{display:flex;gap:24px;flex-wrap:wrap;margin-top:16px}
+    .totals .card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:200px}
+    .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    .value{font-size:18px;font-weight:700;margin-top:4px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .note{color:var(--muted);font-size:13px;margin-top:8px}
+    .section-title{margin:16px 0 8px;font-weight:600}
+    .del{color:#b91c1c}
+    .brandbar{height:3px;background:var(--brand);margin:8px 0 20px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Residential Area Schedule Calculator</h1>
+        <div class="subtitle">Quickly estimate total area and construction cost based on your wish list.</div>
+      </div>
+    </header>
+    <div class="brandbar"></div>
+
+    <section class="panel" id="configPanel">
+      <div class="grid">
+        <div>
+          <div class="label">Cost rate (R per m²) – low</div>
+          <input type="number" id="rateLow" min="0" step="500" />
+        </div>
+        <div>
+          <div class="label">Cost rate (R per m²) – high</div>
+          <input type="number" id="rateHigh" min="0" step="500" />
+        </div>
+      </div>
+      <div class="note">These are indicative build rates. Adjust if needed.</div>
+    </section>
+
+    <section class="panel" style="margin-top:16px">
+      <div class="top-actions" style="display:flex;gap:8px;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:600">Spaces</div>
+        <div style="display:flex;gap:8px">
+          <button id="addRowBtn">Add custom row</button>
+          <button id="resetBtn" title="Revert to defaults">Reset</button>
+        </div>
+      </div>
+
+      <table id="table">
+        <thead>
+          <tr>
+            <th style="width:34px">Include</th>
+            <th style="width:34%">Space</th>
+            <th style="width:100px">Qty</th>
+            <th style="width:140px">Area / unit (m²)</th>
+            <th style="width:150px">Row total (m²)</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+
+      <div class="totals">
+        <div class="card">
+          <div class="label">Total area</div>
+          <div class="value" id="totalArea">0 m²</div>
+        </div>
+        <div class="card">
+          <div class="label">Estimated cost (low)</div>
+          <div class="value" id="costLow">R 0</div>
+        </div>
+        <div class="card">
+          <div class="label">Estimated cost (high)</div>
+          <div class="value" id="costHigh">R 0</div>
+        </div>
+      </div>
+
+      <div class="note">
+        This calculator is indicative only. Final scope, specifications, site conditions, and approvals affect cost.
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // === Edit defaults here (your “God” config) ===
+    const CONFIG = {
+      rateLow: 25000,
+      rateHigh: 30000,
+      rows: [
+        { name: "Main bedroom suite", qty: 1, unit: 22, include: true },
+        { name: "Additional bedrooms", qty: 2, unit: 15, include: true },
+        { name: "Bathrooms (general)", qty: 2, unit: 8, include: true },
+        { name: "Living / family area", qty: 1, unit: 40, include: true },
+        { name: "Dining area", qty: 1, unit: 18, include: true },
+        { name: "Kitchen (main)", qty: 1, unit: 20, include: true },
+        { name: "Scullery / pantry", qty: 1, unit: 10, include: false },
+        { name: "Laundry", qty: 1, unit: 8, include: false },
+        { name: "Study / home office", qty: 1, unit: 12, include: false },
+        { name: "Garage bay", qty: 2, unit: 20, include: true },
+        { name: "Covered patio / braai", qty: 1, unit: 18, include: false },
+        { name: "Pool plant / store", qty: 1, unit: 6, include: false }
+      ]
+    };
+
+    // === App state (loaded from localStorage per browser) ===
+    const KEY = "drew_area_calc_v1";
+    function loadState(){
+      try{
+        const raw = localStorage.getItem(KEY);
+        if(!raw) return null;
+        const s = JSON.parse(raw);
+        // basic sanity
+        if(!Array.isArray(s.rows)) return null;
+        return s;
+      }catch(e){ return null; }
+    }
+    function saveState(){
+      const state = {
+        rateLow: +rateLowEl.value || CONFIG.rateLow,
+        rateHigh: +rateHighEl.value || CONFIG.rateHigh,
+        rows: rows.map(r => ({...r}))
+      };
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    // === DOM refs ===
+    const tbodyEl = document.getElementById('tbody');
+    const rateLowEl = document.getElementById('rateLow');
+    const rateHighEl = document.getElementById('rateHigh');
+    const totalAreaEl = document.getElementById('totalArea');
+    const costLowEl = document.getElementById('costLow');
+    const costHighEl = document.getElementById('costHigh');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // === State ===
+    let rows = [];
+
+    function formatCurrency(n){
+      // simple SA format
+      return "R " + (Math.round(n)).toLocaleString('en-ZA');
+    }
+
+    function render(){
+      // rates
+      const low = +rateLowEl.value || 0;
+      const high = +rateHighEl.value || 0;
+
+      // table
+      tbodyEl.innerHTML = '';
+      let total = 0;
+
+      rows.forEach((row, idx) => {
+        const tr = document.createElement('tr');
+
+        // include
+        const tdInc = document.createElement('td');
+        const inc = document.createElement('input');
+        inc.type = 'checkbox';
+        inc.checked = !!row.include;
+        inc.addEventListener('change', () => { row.include = inc.checked; update(); });
+        tdInc.appendChild(inc);
+
+        // name
+        const tdName = document.createElement('td');
+        const name = document.createElement('input');
+        name.type = 'text';
+        name.value = row.name;
+        name.addEventListener('input', () => { row.name = name.value; saveState(); });
+        tdName.appendChild(name);
+
+        // qty
+        const tdQty = document.createElement('td');
+        const qty = document.createElement('input');
+        qty.type = 'number'; qty.min = '0'; qty.step = '1'; qty.value = row.qty;
+        qty.addEventListener('input', () => { row.qty = +qty.value || 0; update(); });
+        tdQty.appendChild(qty);
+
+        // unit
+        const tdUnit = document.createElement('td');
+        const unit = document.createElement('input');
+        unit.type = 'number'; unit.min = '0'; unit.step = '1'; unit.value = row.unit;
+        unit.addEventListener('input', () => { row.unit = +unit.value || 0; update(); });
+        tdUnit.appendChild(unit);
+
+        // total per row
+        const tdRowTot = document.createElement('td');
+        const rowTot = (row.include ? (row.qty * row.unit) : 0);
+        tdRowTot.textContent = rowTot.toFixed(0) + " m²";
+        total += rowTot;
+
+        // actions
+        const tdAct = document.createElement('td');
+        tdAct.className = 'row-actions';
+        const del = document.createElement('button');
+        del.className = 'del';
+        del.textContent = 'Remove';
+        del.addEventListener('click', () => { rows.splice(idx,1); update(); });
+        tdAct.appendChild(del);
+
+        tr.append(tdInc, tdName, tdQty, tdUnit, tdRowTot, tdAct);
+        tbodyEl.appendChild(tr);
+      });
+
+      totalAreaEl.textContent = total.toFixed(0) + " m²";
+      costLowEl.textContent = formatCurrency(total * low);
+      costHighEl.textContent = formatCurrency(total * high);
+
+      saveState();
+    }
+
+    function update(){ render(); }
+
+    function addRow(){
+      rows.push({ name: "Custom space", qty: 1, unit: 10, include: true });
+      render();
+    }
+
+    function resetToDefaults(){
+      localStorage.removeItem(KEY);
+      init();
+    }
+
+    function init(){
+      // load defaults or saved
+      const saved = loadState();
+      rows = saved?.rows || CONFIG.rows.map(r => ({...r}));
+      rateLowEl.value = saved?.rateLow ?? CONFIG.rateLow;
+      rateHighEl.value = saved?.rateHigh ?? CONFIG.rateHigh;
+
+      rateLowEl.addEventListener('input', update);
+      rateHighEl.addEventListener('input', update);
+      addRowBtn.addEventListener('click', addRow);
+      resetBtn.addEventListener('click', resetToDefaults);
+
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
